@@ -1,19 +1,65 @@
+# from fastapi import FastAPI, Depends, HTTPException
+# from sqlalchemy.orm import Session
+# from typing import List, Optional
+
+# from .db import get_db
+# from .init_db import ensure_db_initialized
+# from . import models, schemas
+
+
+# app = FastAPI(title="COMP680 Backend", version="1.0.0")
+
+
+# @app.on_event("startup")
+# def on_startup():
+#     ensure_db_initialized()
+
+# from pathlib import Path
+# from fastapi.responses import FileResponse
+# from fastapi.staticfiles import StaticFiles
+
+# app = FastAPI(title="COMP680 Backend", version="0.1.0")
+
+# STATIC_DIR = Path(__file__).parent / "static"
+# FAVICON_PATH = STATIC_DIR / "favicon.ico"
+
+# app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+# @app.get("/favicon.ico", include_in_schema=False)
+# def favicon():
+#     if not FAVICON_PATH.exists():
+#         raise HTTPException(status_code=404, detail="favicon not found")
+#     return FileResponse(FAVICON_PATH)
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
+
+from pathlib import Path
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from .db import get_db
 from .init_db import ensure_db_initialized
 from . import models, schemas
 
-
 app = FastAPI(title="COMP680 Backend", version="1.0.0")
-
 
 @app.on_event("startup")
 def on_startup():
     ensure_db_initialized()
 
+STATIC_DIR = Path(__file__).parent / "static"
+FAVICON_PATH = STATIC_DIR / "favicon.ico"
+
+# Only mount if the folder exists (prevents crashes if missing)
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    if not FAVICON_PATH.exists():
+        raise HTTPException(status_code=404, detail="favicon not found")
+    return FileResponse(FAVICON_PATH)
 
 @app.get("/health")
 def health():
