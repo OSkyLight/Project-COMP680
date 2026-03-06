@@ -1,5 +1,35 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Any
+
+
+# ---------- Schema introspection ----------
+class ColumnInfo(BaseModel):
+    cid: int
+    name: str
+    type: str
+    not_null: bool
+    default_value: Optional[Any]
+    primary_key: bool
+
+
+class ForeignKeyInfo(BaseModel):
+    id: int
+    seq: int
+    table: str
+    from_column: str
+    to_column: str
+    on_update: str
+    on_delete: str
+
+
+class TableSchema(BaseModel):
+    table_name: str
+    columns: List[ColumnInfo]
+    foreign_keys: List[ForeignKeyInfo]
+
+
+class DatabaseSchema(BaseModel):
+    tables: List[TableSchema]
 
 
 # ---------- Student ----------

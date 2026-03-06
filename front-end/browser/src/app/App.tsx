@@ -6,21 +6,24 @@ import { UnmetRequirements } from "./components/UnmetRequirements";
 import { Recommendations } from "./components/Recommendations";
 import { CompletedCourses } from "./components/CompletedCourses";
 import { PrerequisiteGraph } from "./components/PrerequisiteGraph";
+import { DatabaseSchema } from "./components/DatabaseSchema";
 import {
   Brain,
   LayoutDashboard,
   AlertTriangle,
   CheckCircle2,
   Share2,
+  Database,
 } from "lucide-react";
 
-type Tab = "dashboard" | "unmet" | "completed" | "prereq";
+type Tab = "dashboard" | "unmet" | "completed" | "prereq" | "schema";
 
 const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "unmet", label: "Unmet Requirements", icon: AlertTriangle },
   { id: "completed", label: "Completed Courses", icon: CheckCircle2 },
   { id: "prereq", label: "Prerequisite Map", icon: Share2 },
+  { id: "schema", label: "Database Schema", icon: Database },
 ];
 
 export default function App() {
@@ -120,6 +123,13 @@ export default function App() {
         {activeTab === "prereq" && (
           <div className="space-y-6">
             <PrerequisiteGraph />
+          </div>
+        )}
+
+        {/* ── Database Schema ── */}
+        {activeTab === "schema" && (
+          <div className="space-y-6">
+            <DatabaseSchema />
           </div>
         )}
       </main>

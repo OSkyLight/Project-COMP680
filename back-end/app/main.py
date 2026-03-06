@@ -1,8 +1,11 @@
+import re
+
 from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
-from .db import get_db
+from .db import get_db, engine
 from .init_db import ensure_db_initialized
 from . import models, schemas
 
@@ -18,6 +21,67 @@ def on_startup():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# ---------------- Schema ----------------
+_SAFE_IDENTIFIER = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
+
+
+@app.get("/schema", response_model=schemas.DatabaseSchema)
+def get_schema():
+    """Return the names, columns, and foreign keys for every user table in the database."""
+    tables: list[schemas.TableSchema] = []
+
+    with engine.connect() as conn:
+        # List all user-created tables (exclude SQLite internal tables)
+        table_rows = conn.execute(
+            text("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+        ).fetchall()
+
+        for (table_name,) in table_rows:
+            # Validate table name is a safe SQL identifier before interpolating it
+            # into PRAGMA statements (PRAGMA does not support bound parameters).
+            if not _SAFE_IDENTIFIER.match(table_name):
+                continue
+
+            # Column info via PRAGMA
+            col_rows = conn.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
+            columns = [
+                schemas.ColumnInfo(
+                    cid=row[0],
+                    name=row[1],
+                    type=row[2],
+                    not_null=bool(row[3]),
+                    default_value=row[4],
+                    primary_key=bool(row[5]),
+                )
+                for row in col_rows
+            ]
+
+            # Foreign key info via PRAGMA
+            fk_rows = conn.execute(text(f"PRAGMA foreign_key_list({table_name})")).fetchall()
+            foreign_keys = [
+                schemas.ForeignKeyInfo(
+                    id=row[0],
+                    seq=row[1],
+                    table=row[2],
+                    from_column=row[3],
+                    to_column=row[4],
+                    on_update=row[5],
+                    on_delete=row[6],
+                )
+                for row in fk_rows
+            ]
+
+            tables.append(
+                schemas.TableSchema(
+                    table_name=table_name,
+                    columns=columns,
+                    foreign_keys=foreign_keys,
+                )
+            )
+
+    return schemas.DatabaseSchema(tables=tables)
 
 
 # ---------------- Students ----------------
