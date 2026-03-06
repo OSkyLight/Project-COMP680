@@ -1,28 +1,34 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
-from .db import Base, engine, get_db
+from .db import get_db
+from .init_db import ensure_db_initialized
 from . import models, schemas
-from .planner import simple_plan
 
-app = FastAPI(title="COMP680 Backend", version="0.1.0")
 
-# Create tables if not exist (for quick local dev)
-Base.metadata.create_all(bind=engine)
+app = FastAPI(title="COMP680 Backend", version="1.0.0")
+
+
+@app.on_event("startup")
+def on_startup():
+    ensure_db_initialized()
+
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
-# ---- Students ----
+
+# ---------------- Students ----------------
 @app.post("/students", response_model=schemas.StudentOut)
 def create_student(payload: schemas.StudentCreate, db: Session = Depends(get_db)):
-    s = models.Student(full_name=payload.full_name, degree_id=payload.degree_id)
+    s = models.Student(name=payload.name, degree=payload.degree)
     db.add(s)
     db.commit()
     db.refresh(s)
     return s
+
 
 @app.get("/students/{student_id}", response_model=schemas.StudentOut)
 def get_student(student_id: int, db: Session = Depends(get_db)):
@@ -31,119 +37,152 @@ def get_student(student_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Student not found")
     return s
 
-# ---- Courses ----
+
+# ---------------- Courses ----------------
 @app.post("/courses", response_model=schemas.CourseOut)
-def upsert_course(payload: schemas.CourseCreate, db: Session = Depends(get_db)):
-    c = db.query(models.Course).filter(models.Course.course_id == payload.course_id).first()
-    if c:
-        c.title = payload.title
-        c.credits = payload.credits
-        c.prereq_expr = payload.prereq_expr
-    else:
-        c = models.Course(**payload.model_dump())
-        db.add(c)
+def create_course(payload: schemas.CourseCreate, db: Session = Depends(get_db)):
+    c = models.Course(**payload.model_dump())
+    db.add(c)
     db.commit()
+    db.refresh(c)
     return c
 
+
 @app.get("/courses", response_model=List[schemas.CourseOut])
-def list_courses(db: Session = Depends(get_db)):
-    return db.query(models.Course).order_by(models.Course.course_id.asc()).all()
+def list_courses(
+    course_code: Optional[str] = None,
+    day: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    q = db.query(models.Course)
+    if course_code:
+        q = q.filter(models.Course.course_code == course_code)
+    if day:
+        q = q.filter(models.Course.day == day)
+    return q.order_by(models.Course.course_id.asc()).all()
 
-# ---- Offerings ----
-@app.post("/offerings", response_model=schemas.OfferingOut)
-def create_offering(payload: schemas.OfferingCreate, db: Session = Depends(get_db)):
-    # Ensure course exists
-    c = db.query(models.Course).filter(models.Course.course_id == payload.course_id).first()
-    if not c:
-        raise HTTPException(status_code=400, detail="course_id not found in courses")
-    off = models.Offering(**payload.model_dump())
-    db.add(off)
-    db.commit()
-    db.refresh(off)
-    return off
 
-@app.get("/offerings", response_model=List[schemas.OfferingOut])
-def list_offerings(term: str, db: Session = Depends(get_db)):
-    return (
-        db.query(models.Offering)
-        .filter(models.Offering.term == term)
-        .order_by(models.Offering.course_id.asc(), models.Offering.section.asc())
-        .all()
-    )
-
-# ---- Schedule blocks ----
-@app.post("/schedule-blocks", response_model=schemas.ScheduleBlockOut)
-def create_schedule_block(payload: schemas.ScheduleBlockCreate, db: Session = Depends(get_db)):
+# ---------------- Free time ----------------
+@app.post("/freetime", response_model=schemas.FreeTimeOut)
+def add_freetime(payload: schemas.FreeTimeCreate, db: Session = Depends(get_db)):
     s = db.query(models.Student).filter(models.Student.student_id == payload.student_id).first()
     if not s:
-        raise HTTPException(status_code=400, detail="student_id not found")
-    b = models.StudentScheduleBlock(**payload.model_dump())
-    db.add(b)
-    db.commit()
-    db.refresh(b)
-    return b
+        raise HTTPException(status_code=404, detail="Student not found")
 
-@app.get("/schedule-blocks", response_model=List[schemas.ScheduleBlockOut])
-def list_schedule_blocks(student_id: int, term: str, db: Session = Depends(get_db)):
+    ft = models.StudentFreeTime(**payload.model_dump())
+    db.add(ft)
+    db.commit()
+    db.refresh(ft)
+    return ft
+
+
+@app.get("/freetime", response_model=List[schemas.FreeTimeOut])
+def list_freetime(student_id: int, db: Session = Depends(get_db)):
     return (
-        db.query(models.StudentScheduleBlock)
-        .filter(models.StudentScheduleBlock.student_id == student_id,
-                models.StudentScheduleBlock.term == term)
-        .order_by(models.StudentScheduleBlock.day_of_week.asc(),
-                  models.StudentScheduleBlock.start_time.asc())
+        db.query(models.StudentFreeTime)
+        .filter(models.StudentFreeTime.student_id == student_id)
+        .order_by(models.StudentFreeTime.day.asc(), models.StudentFreeTime.start_time.asc())
         .all()
     )
 
-# ---- Degree requirements ----
-@app.post("/degree-requirements", response_model=schemas.DegreeReqOut)
-def create_degree_req(payload: schemas.DegreeReqCreate, db: Session = Depends(get_db)):
-    req = models.DegreeRequirement(**payload.model_dump())
-    db.add(req)
-    db.commit()
-    db.refresh(req)
-    return req
 
-@app.get("/degree-requirements", response_model=List[schemas.DegreeReqOut])
-def list_degree_req(degree_id: str, db: Session = Depends(get_db)):
+# ---------------- Audit ----------------
+@app.post("/audit", response_model=schemas.AuditOut)
+def add_audit(payload: schemas.AuditCreate, db: Session = Depends(get_db)):
+    s = db.query(models.Student).filter(models.Student.student_id == payload.student_id).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    a = models.Audit(**payload.model_dump())
+    db.add(a)
+    db.commit()
+    db.refresh(a)
+    return a
+
+
+@app.get("/audit", response_model=List[schemas.AuditOut])
+def list_audit(student_id: int, db: Session = Depends(get_db)):
     return (
-        db.query(models.DegreeRequirement)
-        .filter(models.DegreeRequirement.degree_id == degree_id)
-        .order_by(models.DegreeRequirement.req_id.asc())
+        db.query(models.Audit)
+        .filter(models.Audit.student_id == student_id)
+        .order_by(models.Audit.id.asc())
         .all()
     )
 
-# ---- Planner ----
+
+# ---------------- Planner (simple) ----------------
+def _time_to_minutes(t: str) -> int:
+    hh, mm = t.split(":")
+    return int(hh) * 60 + int(mm)
+
+
+def _fits_in_freetime(course: models.Course, blocks: List[models.StudentFreeTime]) -> bool:
+    c_start = _time_to_minutes(course.start_time)
+    c_end = _time_to_minutes(course.end_time)
+    for b in blocks:
+        if b.day != course.day:
+            continue
+        b_start = _time_to_minutes(b.start_time)
+        b_end = _time_to_minutes(b.end_time)
+        if c_start >= b_start and c_end <= b_end:
+            return True
+    return False
+
+
 @app.post("/plan", response_model=schemas.PlanResponse)
 def plan(payload: schemas.PlanRequest, db: Session = Depends(get_db)):
     student = db.query(models.Student).filter(models.Student.student_id == payload.student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
 
-    selected, total, conflicts, reasoning = simple_plan(
-        db=db,
-        student_id=payload.student_id,
-        term=payload.term,
-        target_credits=payload.target_credits
+    freetime = (
+        db.query(models.StudentFreeTime)
+        .filter(models.StudentFreeTime.student_id == payload.student_id)
+        .all()
     )
 
-    items = []
-    for off, course in selected:
-        items.append(schemas.PlanCourseItem(
-            offering_id=off.offering_id,
-            course_id=off.course_id,
-            section=off.section,
-            days=off.days,
-            start_time=off.start_time,
-            end_time=off.end_time,
-            credits=course.credits,
-        ))
+    if not freetime:
+        return schemas.PlanResponse(
+            student_id=payload.student_id,
+            recommended=[],
+            reasoning=["No free time blocks found for this student."]
+        )
+
+    # audit missing set
+    missing_codes = set()
+    if payload.prefer_missing_only:
+        missing_codes = {
+            a.course_code for a in db.query(models.Audit)
+            .filter(models.Audit.student_id == payload.student_id, models.Audit.status == "missing")
+            .all()
+        }
+
+    courses = db.query(models.Course).order_by(models.Course.course_id.asc()).all()
+
+    recommended = []
+    for c in courses:
+        if payload.prefer_missing_only and missing_codes and c.course_code not in missing_codes:
+            continue
+        if _fits_in_freetime(c, freetime):
+            recommended.append(
+                schemas.PlanCourseItem(
+                    course_id=c.course_id,
+                    course_code=c.course_code,
+                    course_name=c.course_name,
+                    day=c.day,
+                    start_time=c.start_time,
+                    end_time=c.end_time,
+                )
+            )
+
+    reasoning = [
+        "Filtered courses by whether they fit inside the student's free-time blocks.",
+    ]
+    if payload.prefer_missing_only:
+        reasoning.append("Prefer courses whose course_code appears in audit with status='missing'.")
 
     return schemas.PlanResponse(
         student_id=payload.student_id,
-        term=payload.term,
-        target_credits=payload.target_credits,
-        total_credits=total,
-        selected_courses=items,
-        conflicts=conflicts,
-        reasoning=reasoning
+        recommended=recommended,
+        reasoning=reasoning,
     )

@@ -1,79 +1,97 @@
-from pydantic import BaseModel
-from typing import Optional, List
+from pydantic import BaseModel, Field
+from typing import List, Optional
 
+
+# ---------- Student ----------
 class StudentCreate(BaseModel):
-    full_name: Optional[str] = None
-    degree_id: str
+    name: str
+    degree: str
+
 
 class StudentOut(BaseModel):
     student_id: int
-    full_name: Optional[str] = None
-    degree_id: str
+    name: str
+    degree: str
 
+    class Config:
+        from_attributes = True
+
+
+# ---------- Course ----------
 class CourseCreate(BaseModel):
-    course_id: str
-    title: str
-    credits: int
-    prereq_expr: Optional[str] = None
+    course_code: str = Field(..., examples=["COMP 680"])
+    course_name: str
+    day: str = Field(..., examples=["Mon", "Tue"])
+    start_time: str = Field(..., examples=["18:00"])
+    end_time: str = Field(..., examples=["20:45"])
 
-class CourseOut(CourseCreate):
-    pass
 
-class OfferingCreate(BaseModel):
-    term: str
-    course_id: str
-    section: str
-    days: str
+class CourseOut(BaseModel):
+    course_id: int
+    course_code: str
+    course_name: str
+    day: str
     start_time: str
     end_time: str
-    location: Optional[str] = None
-    instructor: Optional[str] = None
-    capacity: Optional[int] = None
-    enrolled: int = 0
 
-class OfferingOut(OfferingCreate):
-    offering_id: int
+    class Config:
+        from_attributes = True
 
-class ScheduleBlockCreate(BaseModel):
+
+# ---------- Free time ----------
+class FreeTimeCreate(BaseModel):
     student_id: int
-    term: str
-    day_of_week: int
+    day: str = Field(..., examples=["Mon"])
+    start_time: str = Field(..., examples=["18:00"])
+    end_time: str = Field(..., examples=["23:59"])
+
+
+class FreeTimeOut(BaseModel):
+    id: int
+    student_id: int
+    day: str
     start_time: str
     end_time: str
-    block_type: Optional[str] = None
-    note: Optional[str] = None
 
-class ScheduleBlockOut(ScheduleBlockCreate):
-    block_id: int
+    class Config:
+        from_attributes = True
 
-class DegreeReqCreate(BaseModel):
-    degree_id: str
-    req_type: str
-    rule_expr: str
-    credits_needed: Optional[int] = None
 
-class DegreeReqOut(DegreeReqCreate):
-    req_id: int
+# ---------- Audit ----------
+class AuditCreate(BaseModel):
+    student_id: int
+    course_code: str = Field(..., examples=["COMP 620"])
+    course_name: str
+    status: str = Field(..., examples=["missing", "completed"])
 
+
+class AuditOut(BaseModel):
+    id: int
+    student_id: int
+    course_code: str
+    course_name: str
+    status: str
+
+    class Config:
+        from_attributes = True
+
+
+# ---------- Plan ----------
 class PlanRequest(BaseModel):
     student_id: int
-    term: str
-    target_credits: int = 15
+    prefer_missing_only: bool = True
+
 
 class PlanCourseItem(BaseModel):
-    offering_id: int
-    course_id: str
-    section: str
-    days: str
+    course_id: int
+    course_code: str
+    course_name: str
+    day: str
     start_time: str
     end_time: str
-    credits: int
+
 
 class PlanResponse(BaseModel):
     student_id: int
-    term: str
-    target_credits: int
-    total_credits: int
-    selected_courses: List[PlanCourseItem]
-    conflicts: List[str]
+    recommended: List[PlanCourseItem]
     reasoning: List[str]
