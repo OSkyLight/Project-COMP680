@@ -183,9 +183,12 @@ def plan(payload: schemas.PlanRequest, db: Session = Depends(get_db)):
                     course_id=c.course_id,
                     course_code=c.course_code,
                     course_name=c.course_name,
+                    units=c.units,
                     day=c.day,
                     start_time=c.start_time,
                     end_time=c.end_time,
+                    instructor=c.instructor,
+                    mode=c.mode,
                 )
             )
 

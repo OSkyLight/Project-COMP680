@@ -21,18 +21,16 @@ class StudentOut(BaseModel):
 class CourseCreate(BaseModel):
     course_code: str = Field(..., examples=["COMP 680"])
     course_name: str
-    day: str = Field(..., examples=["Mon", "Tue"])
+    units: int = Field(..., examples=[3])
+    day: str = Field(..., examples=["Mon", "Tue/Thu", "Mon/Wed", "ARR"])
     start_time: str = Field(..., examples=["18:00"])
     end_time: str = Field(..., examples=["20:45"])
+    instructor: Optional[str] = Field(None, examples=["Boctor,Maged N"])
+    mode: str = Field(..., examples=["OnCampus", "FullyOnline", "SUP"])
 
 
-class CourseOut(BaseModel):
+class CourseOut(CourseCreate):
     course_id: int
-    course_code: str
-    course_name: str
-    day: str
-    start_time: str
-    end_time: str
 
     class Config:
         from_attributes = True
@@ -46,12 +44,8 @@ class FreeTimeCreate(BaseModel):
     end_time: str = Field(..., examples=["23:59"])
 
 
-class FreeTimeOut(BaseModel):
+class FreeTimeOut(FreeTimeCreate):
     id: int
-    student_id: int
-    day: str
-    start_time: str
-    end_time: str
 
     class Config:
         from_attributes = True
@@ -60,17 +54,17 @@ class FreeTimeOut(BaseModel):
 # ---------- Audit ----------
 class AuditCreate(BaseModel):
     student_id: int
+    degree: str
     course_code: str = Field(..., examples=["COMP 620"])
     course_name: str
+    category: str = Field(..., examples=["Electives", "Foundations"])
     status: str = Field(..., examples=["missing", "completed"])
+    elective_code: Optional[int] = Field(None, examples=[4, 5, 6])
+    grade: Optional[str] = Field(None, examples=["A", "B+", None])
 
 
-class AuditOut(BaseModel):
+class AuditOut(AuditCreate):
     id: int
-    student_id: int
-    course_code: str
-    course_name: str
-    status: str
 
     class Config:
         from_attributes = True
@@ -86,9 +80,12 @@ class PlanCourseItem(BaseModel):
     course_id: int
     course_code: str
     course_name: str
+    units: int
     day: str
     start_time: str
     end_time: str
+    instructor: Optional[str] = None
+    mode: str
 
 
 class PlanResponse(BaseModel):
