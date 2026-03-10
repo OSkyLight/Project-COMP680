@@ -12,9 +12,6 @@ def overlaps(a_start: int, a_end: int, b_start: int, b_end: int) -> bool:
 
 
 def split_days(day_str: str) -> List[str]:
-    """
-    Support: "Mon", "Tue/Thu", "Mon/Wed"
-    """
     if not day_str:
         return []
     s = day_str.strip()

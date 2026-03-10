@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 
 
-# ---------- Student ----------
+
 class StudentCreate(BaseModel):
     name: str
     degree: str
@@ -17,7 +17,6 @@ class StudentOut(BaseModel):
         from_attributes = True
 
 
-# ---------- Course ----------
 class CourseCreate(BaseModel):
     course_code: str = Field(..., examples=["COMP 680"])
     course_name: str
@@ -36,7 +35,6 @@ class CourseOut(CourseCreate):
         from_attributes = True
 
 
-# ---------- Free time ----------
 class FreeTimeCreate(BaseModel):
     student_id: int
     day: str = Field(..., examples=["Mon"])
@@ -51,7 +49,7 @@ class FreeTimeOut(FreeTimeCreate):
         from_attributes = True
 
 
-# ---------- Audit ----------
+
 class AuditCreate(BaseModel):
     student_id: int
     degree: str
@@ -70,7 +68,6 @@ class AuditOut(AuditCreate):
         from_attributes = True
 
 
-# ---------- Plan ----------
 class PlanRequest(BaseModel):
     student_id: int
     prefer_missing_only: bool = True
