@@ -4,8 +4,13 @@ back-end/app.db
 __pycache__/
 *.pyc
 
+# Local virtual env and local tooling
+.venv/
+.claude/
+
 # Node frontend
 front-end/node_modules/
+front-end/browser/node_modules/
 
 # VSCode
 .vscode/
