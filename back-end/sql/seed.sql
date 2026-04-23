@@ -1,33 +1,15 @@
--- =========================================
--- seed.sql (Hao Vong) - Master of Computer Science
--- - IP is treated as NOT completed (missing)
--- - elective_code is auto-derived: 4xx -> 4, 5xx -> 5, 6xx -> 6
--- =========================================
-
 PRAGMA foreign_keys = ON;
 
--- -------------------------
--- Student (upsert-ish)
--- -------------------------
 INSERT OR IGNORE INTO student (student_id, name, degree)
 VALUES (1, 'Hao Vong', 'Master of Computer Science');
 
--- If the row already exists, ensure name/degree are correct
 UPDATE student
 SET name='Hao Vong', degree='Master of Computer Science'
 WHERE student_id=1;
 
--- -------------------------
--- Reset Hao Vong audit rows (so re-running seed is clean)
--- -------------------------
 DELETE FROM audit
 WHERE student_id = 1;
 
--- -------------------------
--- Transcript rows (from audit PDF)
--- - A => completed
--- - IP => treat as missing (your requirement)
--- -------------------------
 INSERT INTO audit (student_id, degree, course_code, course_name, category, status, elective_code, grade)
 VALUES
   (1, 'Master of Computer Science', 'COMP 541', 'DATA MINING',         'Electives',            'completed', NULL, 'A'),
@@ -39,26 +21,16 @@ VALUES
   (1, 'Master of Computer Science', 'COMP 640',  'DATABASE SYST DSGN', 'Electives',            'missing',   NULL, NULL),
   (1, 'Master of Computer Science', 'COMP 680',  'ADV TOPICS SWE',     'Foundations',          'missing',   NULL, NULL);
 
--- -------------------------
--- Core area course lists (from audit PDF sections)
--- -------------------------
 INSERT INTO audit (student_id, degree, course_code, course_name, category, status, elective_code, grade)
 VALUES
   (1, 'Master of Computer Science', 'COMP 610', 'TBD', 'Systems',              'missing', NULL, NULL),
   (1, 'Master of Computer Science', 'COMP 620', 'TBD', 'Computer Networking',  'missing', NULL, NULL);
 
--- -------------------------
--- Thesis/Project list
--- -------------------------
 INSERT INTO audit (student_id, degree, course_code, course_name, category, status, elective_code, grade)
 VALUES
   (1, 'Master of Computer Science', 'COMP 696C', 'TBD', 'Thesis/Project', 'missing', NULL, NULL),
   (1, 'Master of Computer Science', 'COMP 698C', 'TBD', 'Thesis/Project', 'missing', NULL, NULL);
 
--- -------------------------
--- Electives COURSE LIST (keep category=Electives, elective_code NULL for now)
--- NOTE: course_name unknown in PDF -> 'TBD'
--- -------------------------
 INSERT INTO audit (student_id, degree, course_code, course_name, category, status, elective_code, grade)
 VALUES
   (1, 'Master of Computer Science', 'COMP 522',  'TBD', 'Electives', 'missing', NULL, NULL),
@@ -95,9 +67,6 @@ VALUES
   (1, 'Master of Computer Science', 'COMP 667',  'TBD', 'Electives', 'missing', NULL, NULL),
   (1, 'Master of Computer Science', 'COMP 684',  'TBD', 'Electives', 'missing', NULL, NULL);
 
--- -------------------------
--- Additional Courses (400-level list) -> still Electives category
--- -------------------------
 INSERT INTO audit (student_id, degree, course_code, course_name, category, status, elective_code, grade)
 VALUES
   (1, 'Master of Computer Science', 'COMP 410',  'TBD', 'Electives', 'missing', NULL, NULL),
@@ -115,11 +84,6 @@ VALUES
   (1, 'Master of Computer Science', 'COMP 484L', 'TBD', 'Electives', 'missing', NULL, NULL),
   (1, 'Master of Computer Science', 'COMP 485',  'TBD', 'Electives', 'missing', NULL, NULL);
 
--- -------------------------
--- AUTO-FILL elective_code for all Electives rows:
--- 4xx -> 4, 5xx -> 5, 6xx -> 6
--- (looks at the first digit of the number after the space)
--- -------------------------
 UPDATE audit
 SET elective_code =
   CASE
@@ -131,39 +95,29 @@ SET elective_code =
 WHERE student_id = 1
   AND category = 'Electives';
 
-  -- Electives total: need at least 12 units
 INSERT OR IGNORE INTO audit_rule
 (degree, category, elective_code, min_units, max_units, min_courses, note)
 VALUES
 ('Master of Computer Science', 'Electives', NULL, 12, NULL, NULL,
  'Need at least 12 elective units total');
 
--- Electives code 4 (400-level bucket): counts at most 6 units toward the 12 elective units
--- IMPORTANT: max_units here means "max COUNTED units toward requirement", not "max you can take"
 INSERT OR IGNORE INTO audit_rule
 (degree, category, elective_code, min_units, max_units, min_courses, note)
 VALUES
 ('Master of Computer Science', 'Electives', 4, 0, 6, NULL,
  'Code 4 (400-level) counts at most 6 units toward the 12 elective units');
 
--- (Optional placeholder) Foundation: choose 1 course
--- If your audit really requires "pick 1 foundation", this encodes it as min_courses=1
 INSERT OR IGNORE INTO audit_rule
 (degree, category, elective_code, min_units, max_units, min_courses, note)
 VALUES
 ('Master of Computer Science', 'Foundation', NULL, 0, NULL, 1,
  'Foundation: choose 1 course');
 
--- (Optional placeholder) Thesis/Project rules - update later if needed
 INSERT OR IGNORE INTO audit_rule
 (degree, category, elective_code, min_units, max_units, min_courses, note)
 VALUES
 ('Master of Computer Science', 'Thesis/Project', NULL, 0, NULL, NULL,
  'Update thesis/project requirements later');
-
- -- Auto-generated from course.pdf (Spring 2026 COMP)
--- Excludes Campus Online (hybrid) classes
--- course_id is set to Class# from the PDF
 
 BEGIN TRANSACTION;
 INSERT OR REPLACE INTO course (course_id, course_code, course_name, units, day, start_time, end_time, instructor, mode) VALUES (15769, 'COMP 424', 'COMP SYSTM SECRTY', 3, 'Tue', '17:00', '19:45', 'Isayan,Sevada', 'FullyOnline');
@@ -293,35 +247,24 @@ VALUES
 ('Master of Computer Science', 'Foundation', NULL, 0, NULL, 1,
  'Choose 1 foundation course');
 
- -- =========================
--- Free time for Hao Vong
--- Mon–Thu after 5PM
--- Fri & Sat all day
--- =========================
 
 DELETE FROM student_schedule_freetime
 WHERE student_id = 1;
 
--- Monday (Mon)
 INSERT INTO student_schedule_freetime (student_id, day, start_time, end_time)
 VALUES (1, 'Mon', '17:00', '23:59');
 
--- Tuesday (Tue)
 INSERT INTO student_schedule_freetime (student_id, day, start_time, end_time)
 VALUES (1, 'Tue', '17:00', '23:59');
 
--- Wednesday (Wed)
 INSERT INTO student_schedule_freetime (student_id, day, start_time, end_time)
 VALUES (1, 'Wed', '17:00', '23:59');
 
--- Thursday (Thu)
 INSERT INTO student_schedule_freetime (student_id, day, start_time, end_time)
 VALUES (1, 'Thu', '17:00', '23:59');
 
--- Friday (Fri) – all day
 INSERT INTO student_schedule_freetime (student_id, day, start_time, end_time)
 VALUES (1, 'Fri', '00:00', '23:59');
 
--- Saturday (Sat) – all day
 INSERT INTO student_schedule_freetime (student_id, day, start_time, end_time)
 VALUES (1, 'Sat', '00:00', '23:59');
