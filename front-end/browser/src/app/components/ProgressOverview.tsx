@@ -1,6 +1,8 @@
 import { BookOpen, CheckCircle, Clock, TrendingUp } from "lucide-react";
 import { computeProgressStats } from "../engine/recommendationEngine";
 import { student } from "../data/degreeData";
+import type { Student } from "../types/student";
+import { demoProfile } from "../utils/demoProfile";
 
 function RadialProgress({ percent, size = 80 }: { percent: number; size?: number }) {
   const r = (size - 10) / 2;
@@ -35,34 +37,52 @@ function BarProgress({ value, max, color }: { value: number; max: number; color:
   );
 }
 
-export function ProgressOverview() {
-  const stats = computeProgressStats();
+interface ProgressOverviewProps {
+  currentStudent?: Student | null;
+}
+
+export function ProgressOverview({ currentStudent }: ProgressOverviewProps = {}) {
+  const staticStats = computeProgressStats();
+  const profile = currentStudent ? demoProfile(currentStudent.student_id) : null;
+
+  const percent        = profile?.percent        ?? staticStats.percent;
+  const totalCompleted = profile?.totalCompleted ?? staticStats.totalCompleted;
+  const totalRequired  = profile?.totalRequired  ?? staticStats.totalRequired;
+  const geCompleted    = profile?.geCompleted    ?? staticStats.geCompleted;
+  const geRequired     = profile?.geRequired     ?? staticStats.geRequired;
+  const coreCompleted  = profile?.coreCompleted  ?? staticStats.coreCompleted;
+  const coreRequired   = profile?.coreRequired   ?? staticStats.coreRequired;
+  const upperCompleted = profile?.upperCompleted ?? staticStats.upperCompleted;
+  const upperRequired  = profile?.upperRequired  ?? staticStats.upperRequired;
+  const gpa            = profile?.gpa            ?? student.gpa;
+  const catalog_year   = profile?.catalog_year   ?? student.catalog_year;
+  const advisor        = profile?.advisor        ?? student.advisor;
 
   const categories = [
     {
       label: "General Education",
-      completed: stats.geCompleted,
-      required: stats.geRequired,
+      completed: geCompleted,
+      required: geRequired,
       color: "#3B82F6",
       icon: "📚",
     },
     {
       label: "Lower Division Core",
-      completed: stats.coreCompleted,
-      required: stats.coreRequired,
+      completed: coreCompleted,
+      required: coreRequired,
       color: "#10B981",
       icon: "🔧",
     },
     {
       label: "Upper Division",
-      completed: stats.upperCompleted,
-      required: stats.upperRequired,
+      completed: upperCompleted,
+      required: upperRequired,
       color: "#8B5CF6",
       icon: "🎓",
     },
   ];
 
-  const remainingUnits = stats.totalRequired - stats.totalCompleted;
+  const remainingUnits = totalRequired - totalCompleted;
   const semestersLeft = Math.ceil(remainingUnits / 15); // ~15 units/semester
 
   return (
@@ -75,10 +95,10 @@ export function ProgressOverview() {
       {/* Overall progress ring + stats */}
       <div className="flex flex-col sm:flex-row items-center gap-6 mb-6 pb-6 border-b border-gray-100">
         <div className="relative flex-shrink-0">
-          <RadialProgress percent={stats.percent} size={110} />
+          <RadialProgress percent={percent} size={110} />
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-[#CC0000]" style={{ fontSize: "1.5rem", fontWeight: 700, lineHeight: 1 }}>
-              {stats.percent}%
+              {percent}%
             </span>
             <span className="text-gray-400" style={{ fontSize: "0.65rem" }}>Complete</span>
           </div>
@@ -90,7 +110,7 @@ export function ProgressOverview() {
               <CheckCircle className="w-4 h-4 text-green-600" />
               <span className="text-green-700" style={{ fontSize: "0.72rem", fontWeight: 600 }}>COMPLETED</span>
             </div>
-            <div className="text-gray-800" style={{ fontSize: "1.4rem", fontWeight: 700 }}>{stats.totalCompleted}</div>
+            <div className="text-gray-800" style={{ fontSize: "1.4rem", fontWeight: 700 }}>{totalCompleted}</div>
             <div className="text-gray-500" style={{ fontSize: "0.72rem" }}>Units earned</div>
           </div>
           <div className="bg-orange-50 rounded-xl p-3">
@@ -114,7 +134,7 @@ export function ProgressOverview() {
               <span style={{ fontSize: "0.9rem" }}>🎓</span>
               <span className="text-purple-700" style={{ fontSize: "0.72rem", fontWeight: 600 }}>GPA</span>
             </div>
-            <div className="text-gray-800" style={{ fontSize: "1.4rem", fontWeight: 700 }}>{student.gpa.toFixed(2)}</div>
+            <div className="text-gray-800" style={{ fontSize: "1.4rem", fontWeight: 700 }}>{gpa.toFixed(2)}</div>
             <div className="text-gray-500" style={{ fontSize: "0.72rem" }}>Cumulative</div>
           </div>
         </div>
@@ -157,11 +177,11 @@ export function ProgressOverview() {
 
       <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-2">
         <div className="text-xs text-gray-400">
-          Catalog Year: <span className="text-gray-600 font-medium">{student.catalog_year}</span>
+          Catalog Year: <span className="text-gray-600 font-medium">{catalog_year}</span>
         </div>
         <span className="text-gray-200">·</span>
         <div className="text-xs text-gray-400">
-          Advisor: <span className="text-gray-600 font-medium">{student.advisor}</span>
+          Advisor: <span className="text-gray-600 font-medium">{advisor}</span>
         </div>
       </div>
     </div>

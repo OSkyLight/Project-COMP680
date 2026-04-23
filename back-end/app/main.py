@@ -1,12 +1,13 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from sqlalchemy import text, inspect
+from typing import List, Optional, Any
 
 from pathlib import Path
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from .db import get_db
+from .db import get_db, engine
 from .init_db import ensure_db_initialized
 from . import models, schemas
 
@@ -34,6 +35,39 @@ def health():
     return {"status": "ok"}
 
 
+# ---------------- Debug (demo-only) ----------------
+def _allowed_tables() -> list[str]:
+    """Return table names that actually exist in the DB."""
+    inspector = inspect(engine)
+    return inspector.get_table_names()
+
+
+@app.get("/debug/tables", response_model=List[str])
+def debug_tables():
+    """Return all table names in the SQLite database."""
+    return _allowed_tables()
+
+
+@app.get("/debug/table/{table_name}")
+def debug_table(
+    table_name: str,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+) -> List[dict[str, Any]]:
+    """Return up to `limit` rows from `table_name`.
+    Only tables that exist in the DB are allowed (prevents SQL injection)."""
+    allowed = _allowed_tables()
+    if table_name not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown table '{table_name}'. Allowed: {allowed}",
+        )
+    # Table name is validated against the inspector whitelist — safe to interpolate.
+    rows = db.execute(text(f"SELECT * FROM {table_name} LIMIT :lim"), {"lim": limit})
+    cols = list(rows.keys())
+    return [dict(zip(cols, row)) for row in rows]
+
+
 # ---------------- Students ----------------
 @app.post("/students", response_model=schemas.StudentOut)
 def create_student(payload: schemas.StudentCreate, db: Session = Depends(get_db)):
@@ -42,6 +76,11 @@ def create_student(payload: schemas.StudentCreate, db: Session = Depends(get_db)
     db.commit()
     db.refresh(s)
     return s
+
+
+@app.get("/students", response_model=List[schemas.StudentOut])
+def list_students(db: Session = Depends(get_db)):
+    return db.query(models.Student).order_by(models.Student.student_id.asc()).all()
 
 
 @app.get("/students/{student_id}", response_model=schemas.StudentOut)

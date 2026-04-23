@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { Student } from "./types/student";
 import { Header } from "./components/Header";
 import { ProgressOverview } from "./components/ProgressOverview";
 import { StudentProfile } from "./components/StudentProfile";
@@ -6,6 +7,7 @@ import { UnmetRequirements } from "./components/UnmetRequirements";
 import { Recommendations } from "./components/Recommendations";
 import { CompletedCourses } from "./components/CompletedCourses";
 import { PrerequisiteGraph } from "./components/PrerequisiteGraph";
+import { BackendDemoPanel } from "./components/BackendDemoPanel";
 import {
   Brain,
   LayoutDashboard,
@@ -23,8 +25,18 @@ const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "prereq", label: "Prerequisite Map", icon: Share2 },
 ];
 
+function lsGetStudent(): Student | null {
+  try {
+    const v = localStorage.getItem("demo_student");
+    return v ? (JSON.parse(v) as Student) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  const [currentStudent, setCurrentStudent] = useState<Student | null>(lsGetStudent);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -58,13 +70,14 @@ export default function App() {
         {/* ── Dashboard ── */}
         {activeTab === "dashboard" && (
           <div className="space-y-6">
+            <BackendDemoPanel currentStudent={currentStudent} onStudentChange={setCurrentStudent} />
             {/* Top row: profile + progress */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-1">
-                <StudentProfile />
+                <StudentProfile currentStudent={currentStudent} />
               </div>
               <div className="lg:col-span-2">
-                <ProgressOverview />
+                <ProgressOverview currentStudent={currentStudent} />
               </div>
             </div>
 
@@ -99,10 +112,10 @@ export default function App() {
           <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-1">
-                <StudentProfile />
+                <StudentProfile currentStudent={currentStudent} />
               </div>
               <div className="lg:col-span-2">
-                <ProgressOverview />
+                <ProgressOverview currentStudent={currentStudent} />
               </div>
             </div>
             <UnmetRequirements />
