@@ -1,5 +1,11 @@
 import { useState } from "react";
 import type { Student } from "./types/student";
+
+export interface PdfStudentInfo {
+  student_name: string;
+  student_id: string;
+  degree_program: string;
+}
 import { Header } from "./components/Header";
 import { ProgressOverview } from "./components/ProgressOverview";
 import { StudentProfile } from "./components/StudentProfile";
@@ -8,21 +14,24 @@ import { Recommendations } from "./components/Recommendations";
 import { CompletedCourses } from "./components/CompletedCourses";
 import { PrerequisiteGraph } from "./components/PrerequisiteGraph";
 import { BackendDemoPanel } from "./components/BackendDemoPanel";
+import { PdfRecommendations } from "./components/PdfRecommendations";
 import {
   Brain,
   LayoutDashboard,
   AlertTriangle,
   CheckCircle2,
   Share2,
+  FileText,
 } from "lucide-react";
 
-type Tab = "dashboard" | "unmet" | "completed" | "prereq";
+type Tab = "dashboard" | "unmet" | "completed" | "prereq" | "pdf";
 
 const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "unmet", label: "Unmet Requirements", icon: AlertTriangle },
   { id: "completed", label: "Completed Courses", icon: CheckCircle2 },
   { id: "prereq", label: "Prerequisite Map", icon: Share2 },
+  { id: "pdf", label: "PDF Recommendations", icon: FileText },
 ];
 
 function lsGetStudent(): Student | null {
@@ -37,10 +46,11 @@ function lsGetStudent(): Student | null {
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [currentStudent, setCurrentStudent] = useState<Student | null>(lsGetStudent);
+  const [pdfStudent, setPdfStudent] = useState<PdfStudentInfo | null>(null);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Header />
+      <Header pdfStudent={pdfStudent} />
 
       {/* Tab Navigation */}
       <div className="bg-white border-b border-gray-100 sticky top-0 z-10 shadow-sm">
@@ -133,6 +143,13 @@ export default function App() {
         {activeTab === "prereq" && (
           <div className="space-y-6">
             <PrerequisiteGraph />
+          </div>
+        )}
+
+        {/* ── PDF Recommendations ── */}
+        {activeTab === "pdf" && (
+          <div className="space-y-6">
+            <PdfRecommendations onPdfResult={setPdfStudent} />
           </div>
         )}
       </main>

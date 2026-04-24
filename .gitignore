@@ -2,6 +2,7 @@
 back-end/.venv/
 back-end/app.db
 back-end/.env
+.env
 __pycache__/
 *.pyc
 
