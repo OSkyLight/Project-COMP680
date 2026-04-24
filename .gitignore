@@ -1,6 +1,7 @@
 # Python backend
 back-end/.venv/
 back-end/app.db
+back-end/.env
 __pycache__/
 *.pyc
 

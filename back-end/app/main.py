@@ -1,9 +1,13 @@
-from fastapi import FastAPI, Depends, HTTPException
+import os
+import tempfile
+
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import text, inspect
 from typing import List, Optional, Any
 
 from pathlib import Path
+from app.pdf_extractor import extract_student_progress_from_pdf
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -348,4 +352,114 @@ def plan_options_demo(
         "student_id": student_id,
         "target_units": target_units,
         "options": out,
+    }
+
+@app.get("/test-pdf-extract")
+def test_pdf_extract():
+    pdf_path = Path(__file__).resolve().parent.parent / "sample_pdfs" / "student_progress_sample.pdf"
+    data = extract_student_progress_from_pdf(str(pdf_path))
+    return data
+
+
+@app.post("/upload-progress-report")
+async def upload_progress_report(file: UploadFile = File(...)):
+    if file.content_type != "application/pdf":
+        return {"error": "Only PDF files are accepted."}
+
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            tmp_path = tmp.name
+            tmp.write(await file.read())
+
+        extracted = extract_student_progress_from_pdf(tmp_path)
+        return {"filename": file.filename, "extracted_data": extracted}
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+
+def _should_exclude_course(c: models.Course, excluded_codes: set) -> bool:
+    if str(c.course_code) in excluded_codes:
+        return True
+    code = str(c.course_code).upper()
+    name = str(c.course_name).upper()
+    if "696" in code or "698" in code:
+        return True
+    if "THESIS" in name or "RESEARCH" in name:
+        return True
+    if (c.day or "").upper() in ("ARR", "TBA"):
+        return True
+    if (c.start_time or "") == "00:00" or (c.end_time or "") == "00:00":
+        return True
+    if (c.mode or "").upper() == "SUP":
+        return True
+    return False
+
+
+def _course_score(c: models.Course) -> tuple:
+    is_comp = 0 if str(c.course_code).upper().startswith("COMP") else 1
+    digits = "".join(ch for ch in str(c.course_code) if ch.isdigit())
+    number = int(digits) if digits else 9999
+    in_target_range = 0 if 400 <= number <= 599 else 1
+    return (is_comp, in_target_range, number)
+
+
+@app.post("/recommend-from-pdf")
+async def recommend_from_pdf(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    if file.content_type != "application/pdf":
+        return {"error": "Only PDF files are accepted."}
+
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            tmp_path = tmp.name
+            tmp.write(await file.read())
+
+        extracted = extract_student_progress_from_pdf(tmp_path)
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+    completed = {str(c["course_code"]) for c in extracted.get("completed_courses", [])}
+    in_progress = {str(c["course_code"]) for c in extracted.get("in_progress_courses", [])}
+    excluded = completed | in_progress
+
+    courses = db.query(models.Course).order_by(models.Course.course_id.asc()).all()
+    filtered = [c for c in courses if not _should_exclude_course(c, excluded)]
+    filtered.sort(key=_course_score)
+
+    recommended = [
+        {
+            "course_id": c.course_id,
+            "course_code": c.course_code,
+            "course_name": c.course_name,
+            "units": c.units,
+            "day": c.day,
+            "start_time": c.start_time,
+            "end_time": c.end_time,
+            "instructor": c.instructor,
+            "mode": c.mode,
+        }
+        for c in filtered[:15]
+    ]
+
+    return {
+        "filename": file.filename,
+        "student_name": extracted.get("student_name", ""),
+        "student_id": extracted.get("student_id", ""),
+        "degree_program": extracted.get("degree_program", ""),
+        "excluded_course_codes": sorted(excluded),
+        "recommended": recommended,
+        "reasoning": [
+            "Excluded courses already completed or currently in progress by the student.",
+            "Excluded special topics and thesis/research courses (696, 698, THESIS, RESEARCH).",
+            "Excluded courses without a real scheduled time (ARR/TBA days, 00:00 times, SUP mode).",
+            "Prioritized COMP-prefixed courses over other departments.",
+            "Prioritized 400-500 level courses as most relevant for degree completion.",
+            "Returned the top 15 recommendations after filtering and sorting.",
+        ],
     }
