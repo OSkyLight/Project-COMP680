@@ -2,6 +2,7 @@ import os
 import tempfile
 
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text, inspect
 from typing import List, Optional, Any
@@ -24,6 +25,18 @@ from .planner_v1 import (
 )
 
 app = FastAPI(title="COMP680 Backend", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://project-comp680-frontend.onrender.com",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 def on_startup():
