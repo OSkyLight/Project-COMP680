@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiUrl } from "../utils/api";
 import type { Student } from "../types/student";
 import { Card, CardHeader, CardTitle, CardAction, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -127,7 +128,7 @@ export function BackendDemoPanel({ currentStudent, onStudentChange }: BackendDem
 
   // auto-fetch health on mount
   useEffect(() => {
-    fetch("/api/health")
+    fetch(apiUrl("/api/health"))
       .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then((json) => { const s = JSON.stringify(json); setHealth(s); setHealthError(null); lsSet(LS.health, s); })
       .catch((e) => setHealthError(String(e)));
@@ -164,7 +165,7 @@ export function BackendDemoPanel({ currentStudent, onStudentChange }: BackendDem
   function loadDbTables() {
     setDbTablesLoading(true);
     setDbTablesError(null);
-    fetch("/api/debug/tables")
+    fetch(apiUrl("/api/debug/tables"))
       .then((r) => { if (!r.ok) throw new Error(`GET /api/debug/tables returned HTTP ${r.status}`); return r.json(); })
       .then((json: string[]) => setDbTables(json))
       .catch((e) => setDbTablesError(String(e)))
@@ -175,7 +176,7 @@ export function BackendDemoPanel({ currentStudent, onStudentChange }: BackendDem
     if (!dbSelectedTable) { setDbRowsError("Select a table first."); return; }
     setDbRowsLoading(true);
     setDbRowsError(null);
-    fetch(`/api/debug/table/${encodeURIComponent(dbSelectedTable)}?limit=25`)
+    fetch(apiUrl(`/api/debug/table/${encodeURIComponent(dbSelectedTable)}?limit=25`))
       .then((r) => { if (!r.ok) throw new Error(`GET /api/debug/table/${dbSelectedTable} returned HTTP ${r.status}`); return r.json(); })
       .then((json: Record<string, unknown>[]) => {
         setDbRows(json);
@@ -189,7 +190,7 @@ export function BackendDemoPanel({ currentStudent, onStudentChange }: BackendDem
   function loadCourses() {
     setCoursesLoading(true);
     setCoursesError(null);
-    fetch("/api/courses")
+    fetch(apiUrl("/api/courses"))
       .then((r) => { if (!r.ok) throw new Error(`GET /api/courses returned HTTP ${r.status}`); return r.json(); })
       .then((json: Course[]) => { setCourses(json); lsSet(LS.courses, json.slice(0, 20)); })
       .catch((e) => setCoursesError(String(e)))
@@ -199,7 +200,7 @@ export function BackendDemoPanel({ currentStudent, onStudentChange }: BackendDem
   function loadStudents() {
     setStudentsLoading(true);
     setStudentsError(null);
-    fetch("/api/students")
+    fetch(apiUrl("/api/students"))
       .then((r) => { if (!r.ok) throw new Error(`GET /api/students returned HTTP ${r.status}`); return r.json(); })
       .then((json: Student[]) => setStudentsList(json))
       .catch((e) => setStudentsError(String(e)))
@@ -221,7 +222,7 @@ export function BackendDemoPanel({ currentStudent, onStudentChange }: BackendDem
     setStudentLoading(true);
     setStudentError(null);
     setStudentResult(null);
-    fetch("/api/students", {
+    fetch(apiUrl("/api/students"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, degree }),
@@ -240,13 +241,13 @@ export function BackendDemoPanel({ currentStudent, onStudentChange }: BackendDem
   const FREETIME_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Mon/Wed", "Tue/Thu"];
 
   async function ensureFreetime(student_id: number): Promise<void> {
-    const existing = await fetch(`/api/freetime?student_id=${student_id}`)
+    const existing = await fetch(apiUrl(`/api/freetime?student_id=${student_id}`))
       .then((r) => r.ok ? r.json() : [])
       .catch(() => []);
     if ((existing as unknown[]).length > 0) return;
     await Promise.all(
       FREETIME_DAYS.map((day) =>
-        fetch("/api/freetime", {
+        fetch(apiUrl("/api/freetime"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ student_id, day, start_time: "07:00", end_time: "22:00" }),
@@ -265,7 +266,7 @@ export function BackendDemoPanel({ currentStudent, onStudentChange }: BackendDem
     setPlanResult(null);
     try {
       await ensureFreetime(id);
-      const r = await fetch("/api/plan", {
+      const r = await fetch(apiUrl("/api/plan"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ student_id: id, prefer_missing_only: true }),

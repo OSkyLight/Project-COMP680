@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { UploadCloud, Loader2, AlertCircle, FileText, CheckCircle2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "./ui/card";
 import type { PdfStudentInfo } from "../App";
+import { apiUrl } from "../utils/api";
 
 interface RecommendedCourse {
   course_id: number;
@@ -96,7 +97,7 @@ export function PdfRecommendations({ onPdfResult }: PdfRecommendationsProps) {
     setResult(null);
 
     try {
-      const response = await fetch("/api/recommend-from-pdf", {
+      const response = await fetch(apiUrl("/api/recommend-from-pdf"), {
         method: "POST",
         body: formData,
       });
