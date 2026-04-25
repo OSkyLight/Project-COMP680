@@ -14,6 +14,7 @@ interface RecommendedCourse {
   end_time: string;
   instructor: string | null;
   mode: string;
+  reason?: string;
 }
 
 interface PdfResult {
@@ -39,6 +40,7 @@ interface GroupedCourse {
   course_code: string;
   course_name: string;
   units: number;
+  reason?: string;
   sections: CourseSection[];
 }
 
@@ -50,6 +52,7 @@ function groupByCourseCode(courses: RecommendedCourse[]): GroupedCourse[] {
         course_code: c.course_code,
         course_name: c.course_name,
         units: c.units,
+        reason: c.reason,
         sections: [],
       });
     }
@@ -280,6 +283,9 @@ function GroupedCourseCard({ group }: { group: GroupedCourse }) {
             {group.course_code}
           </span>
           <p className="text-sm font-medium text-gray-800 mt-0.5">{group.course_name}</p>
+          {group.reason && (
+            <p className="text-xs text-gray-400 mt-0.5">{group.reason}</p>
+          )}
         </div>
         <span className="text-xs bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5 whitespace-nowrap">
           {group.units} {group.units === 1 ? "unit" : "units"}
