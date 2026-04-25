@@ -411,11 +411,48 @@ def _should_exclude_course(c: models.Course, excluded_codes: set) -> bool:
 
 
 def _course_score(c: models.Course) -> tuple:
-    is_comp = 0 if str(c.course_code).upper().startswith("COMP") else 1
-    digits = "".join(ch for ch in str(c.course_code) if ch.isdigit())
+    code = str(c.course_code).upper()
+    digits = "".join(ch for ch in code if ch.isdigit())
     number = int(digits) if digits else 9999
-    in_target_range = 0 if 400 <= number <= 599 else 1
-    return (is_comp, in_target_range, number)
+
+    # Prefer COMP-prefixed courses over other departments
+    is_comp = 0 if code.startswith("COMP") else 1
+
+    # Deprioritize low-value special course numbers that slipped past the name filter
+    # (independent study, directed readings, special seminars, etc.)
+    low_value_numbers = {691, 692, 693, 694, 695, 697, 699}
+    is_low_value = 1 if number in low_value_numbers else 0
+
+    # Level tiers ordered by typical CS degree relevance:
+    #   0 = 300–499 upper-division undergrad core
+    #   1 = 500–599 graduate / advanced
+    #   2 = 200–299 lower-division
+    #   3 = everything else
+    if 300 <= number <= 499:
+        level_tier = 0
+    elif 500 <= number <= 599:
+        level_tier = 1
+    elif 200 <= number <= 299:
+        level_tier = 2
+    else:
+        level_tier = 3
+
+    return (is_comp, is_low_value, level_tier, number)
+
+
+def _course_reason(c: models.Course) -> str:
+    code = str(c.course_code).upper()
+    digits = "".join(ch for ch in code if ch.isdigit())
+    number = int(digits) if digits else 0
+    dept = code.split()[0] if code.split() else code
+
+    if 300 <= number <= 499:
+        return f"Upper-division {dept} course"
+    if 500 <= number <= 599:
+        return f"Graduate-level {dept} course"
+    if 200 <= number <= 299:
+        return f"Lower-division {dept} course"
+    return f"{dept} course"
 
 
 @app.post("/recommend-from-pdf")
@@ -456,6 +493,7 @@ async def recommend_from_pdf(
             "end_time": c.end_time,
             "instructor": c.instructor,
             "mode": c.mode,
+            "reason": _course_reason(c),
         }
         for c in filtered[:15]
     ]
@@ -471,8 +509,9 @@ async def recommend_from_pdf(
             "Excluded courses already completed or currently in progress by the student.",
             "Excluded special topics and thesis/research courses (696, 698, THESIS, RESEARCH).",
             "Excluded courses without a real scheduled time (ARR/TBA days, 00:00 times, SUP mode).",
+            "Excluded low-value special course numbers (691–695, 697, 699: independent study, directed readings).",
             "Prioritized COMP-prefixed courses over other departments.",
-            "Prioritized 400-500 level courses as most relevant for degree completion.",
-            "Returned the top 15 recommendations after filtering and sorting.",
+            "Ranked by level: upper-division (300–499) first, then graduate (500–599), then lower-division.",
+            "Returned the top 15 sections after filtering and ranking.",
         ],
     }
