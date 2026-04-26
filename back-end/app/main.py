@@ -408,6 +408,43 @@ _ELECTIVE_EXCLUDED = {
     "COMP492", "COMP494", "COMP499", "COMP502",
 }
 
+# Lower-division major requirements — all are required for the CS BS.
+# COMP 110/110L may be waived with AP CS exam credit; include it here
+# so a student without it still sees it flagged as missing.
+_LOWER_DIV_MAJOR = {
+    "COMP110",  "COMP110L",   # Intro to Algorithms (AP-waivable)
+    "COMP122",  "COMP122L",   # Intro to Computer Systems
+    "COMP182",  "COMP182L",   # Data Structures and Program Design
+    "COMP222",                # Computer Organization and Assembly Language
+    "COMP256",  "COMP256L",   # Discrete Structures
+    "COMP282",                # Algorithms Analysis
+    "MATH150A", "MATH150B",   # Calculus I & II
+    "MATH262",                # Intro to Linear Algebra
+    "PHIL230",                # Introduction to Logic
+}
+
+# Science requirement groups — student must complete one course+lab from
+# each group. Normalized codes; actual approved lists may vary by catalog year.
+_LIFE_SCIENCE = {
+    "BIO100",  "BIO100L",
+    "BIO101",  "BIO101L",
+    "BIO102",  "BIO102L",
+    "BIO105",  "BIO105L",
+    "BIO106",  "BIO106L",
+    "CHEM100", "CHEM100L",
+    "CHEM101", "CHEM101L",
+}
+
+_PHYSICAL_SCIENCE = {
+    "PHYS100A",  "PHYS100AL",
+    "PHYS220A",  "PHYS220AL",
+    "PHYS220B",  "PHYS220BL",
+    "CHEM102",   "CHEM102L",
+    "GEOL101",   "GEOL101L",
+}
+
+SENIOR_ELECTIVE_UNITS_REQUIRED = 15
+
 def _norm(code: str) -> str:
     """Normalize a course code for set lookups: uppercase, no spaces."""
     return code.upper().replace(" ", "")
@@ -474,6 +511,111 @@ def _course_reason(c: models.Course) -> str:
     return "Other course"
 
 
+# ── Degree Progress Analysis ─────────────────────────────────────────────────
+
+def _analyze_degree_progress(extracted: dict) -> dict:
+    """
+    Compute how far the student is through each CS BS requirement bucket
+    using the data returned by extract_student_progress_from_pdf.
+    In-progress courses are treated as not missing (not yet counted as complete).
+    """
+    completed_raw = extracted.get("completed_courses", []) or []
+    in_progress_raw = extracted.get("in_progress_courses", []) or []
+
+    completed_norms = {_norm(str(c.get("course_code", ""))) for c in completed_raw}
+    in_progress_norms = {_norm(str(c.get("course_code", ""))) for c in in_progress_raw}
+    # Treat in-progress as "not missing" but not yet "completed"
+    all_seen = completed_norms | in_progress_norms
+
+    # ── Upper-division required core ───────────────────────────────────────
+    completed_core = sorted(_REQUIRED_CORE & completed_norms)
+    missing_core = sorted(_REQUIRED_CORE - all_seen)
+
+    # ── Lower-division major ───────────────────────────────────────────────
+    completed_lower = sorted(_LOWER_DIV_MAJOR & completed_norms)
+    missing_lower = sorted(_LOWER_DIV_MAJOR - all_seen)
+
+    # ── Science requirements (choice-based groups) ─────────────────────────
+    # Each group is satisfied when the student has completed at least one
+    # course from the approved set (lecture + lab are typically taken together).
+    completed_life = sorted(_LIFE_SCIENCE & completed_norms)
+    completed_phys = sorted(_PHYSICAL_SCIENCE & completed_norms)
+
+    # Also include in-progress science courses when judging satisfaction
+    life_satisfied = bool(_LIFE_SCIENCE & all_seen)
+    phys_satisfied = bool(_PHYSICAL_SCIENCE & all_seen)
+
+    completed_sci = sorted((_LIFE_SCIENCE | _PHYSICAL_SCIENCE) & completed_norms)
+    missing_sci: list[str] = []
+    if not life_satisfied:
+        missing_sci.append("Life science course with lab (one from approved list)")
+    if not phys_satisfied:
+        missing_sci.append("Physical science course with lab (one from approved list)")
+
+    # ── Senior electives ───────────────────────────────────────────────────
+    elective_units = 0
+    completed_electives: list[str] = []
+    for c in completed_raw:
+        code_raw = str(c.get("course_code", ""))
+        norm = _norm(code_raw)
+        code_upper = code_raw.upper().replace(" ", "")
+        digits = "".join(ch for ch in code_upper if ch.isdigit())
+        number = int(digits) if digits else 0
+        if (code_upper.startswith("COMP")
+                and 400 <= number <= 599
+                and norm not in _ELECTIVE_EXCLUDED):
+            try:
+                units = int(c.get("units") or 0)
+            except (TypeError, ValueError):
+                units = 0
+            elective_units += units
+            completed_electives.append(code_raw)
+
+    elective_remaining = max(0, SENIOR_ELECTIVE_UNITS_REQUIRED - elective_units)
+
+    # ── Plain-language notes ───────────────────────────────────────────────
+    notes: list[str] = []
+    if missing_core:
+        notes.append(
+            f"{len(missing_core)} upper-division required course(s) still needed: "
+            + ", ".join(missing_core) + "."
+        )
+    if missing_lower:
+        notes.append(
+            f"{len(missing_lower)} lower-division major course(s) still needed: "
+            + ", ".join(missing_lower) + "."
+        )
+    if not life_satisfied:
+        notes.append("Life science requirement not yet satisfied.")
+    if not phys_satisfied:
+        notes.append("Physical science requirement not yet satisfied.")
+    if elective_remaining > 0:
+        notes.append(
+            f"Senior electives: {elective_units}/{SENIOR_ELECTIVE_UNITS_REQUIRED} units "
+            f"completed, {elective_remaining} more needed."
+        )
+    if not missing_core and not missing_lower and life_satisfied and phys_satisfied and elective_remaining == 0:
+        notes.append(
+            "All tracked upper-division, lower-division, science, "
+            "and senior elective requirements appear satisfied."
+        )
+
+    return {
+        "completed_required_core": completed_core,
+        "missing_required_core": missing_core,
+        "completed_lower_division_major": completed_lower,
+        "missing_lower_division_major": missing_lower,
+        "life_science_requirement_satisfied": life_satisfied,
+        "physical_science_requirement_satisfied": phys_satisfied,
+        "completed_science_requirements": completed_sci,
+        "missing_science_requirements": missing_sci,
+        "completed_senior_electives": sorted(completed_electives),
+        "senior_elective_units_completed": elective_units,
+        "senior_elective_units_remaining": elective_remaining,
+        "notes": notes,
+    }
+
+
 @app.post("/recommend-from-pdf")
 async def recommend_from_pdf(
     file: UploadFile = File(...),
@@ -496,6 +638,8 @@ async def recommend_from_pdf(
     completed = {str(c["course_code"]) for c in extracted.get("completed_courses", [])}
     in_progress = {str(c["course_code"]) for c in extracted.get("in_progress_courses", [])}
     excluded = completed | in_progress
+
+    degree_progress = _analyze_degree_progress(extracted)
 
     courses = db.query(models.Course).order_by(models.Course.course_id.asc()).all()
     filtered = [c for c in courses if not _should_exclude_course(c, excluded)]
@@ -525,6 +669,7 @@ async def recommend_from_pdf(
         "degree_program": extracted.get("degree_program", ""),
         "excluded_course_codes": sorted(excluded),
         "recommended": recommended,
+        "degree_progress": degree_progress,
         "reasoning": [
             "Excluded courses already completed or currently in progress by the student.",
             "Excluded special topics and thesis/research courses (696, 698, THESIS, RESEARCH).",
@@ -532,6 +677,7 @@ async def recommend_from_pdf(
             "Excluded low-value special course numbers (691–695, 697, 699) and graduate-only 600-level courses.",
             "Classified each course: Required Core, Senior Elective, or Other using the CS BS major structure.",
             "Prioritized missing upper-division required courses before senior electives and other courses.",
+            "Computed degree progress buckets: required core, lower-division, science, and senior electives.",
             "Returned the top 15 sections after filtering and ranking.",
         ],
     }
