@@ -485,7 +485,17 @@ def _classify_course(c: models.Course) -> str:
     code = str(c.course_code).upper()
     digits = "".join(ch for ch in code if ch.isdigit())
     number = int(digits) if digits else 0
-    if code.startswith("COMP") and 400 <= number <= 599 and norm not in _ELECTIVE_EXCLUDED:
+    try:
+        units = int(c.units or 0)
+    except (TypeError, ValueError):
+        units = 0
+    if (
+        code.startswith("COMP")
+        and 400 <= number <= 599
+        and norm not in _ELECTIVE_EXCLUDED
+        and not norm.endswith("L")   # exclude lab-only course codes (e.g. COMP484L)
+        and units > 1                # exclude 1-unit lab/support courses
+    ):
         return "Senior Elective"
     return "Other"
 
@@ -505,10 +515,10 @@ def _course_score(c: models.Course) -> tuple:
 def _course_reason(c: models.Course) -> str:
     category = _classify_course(c)
     if category == "Required Core":
-        return "Missing upper-division required course"
+        return "Missing required upper-division core course"
     if category == "Senior Elective":
         return "Valid senior elective for the CS major"
-    return "Other course"
+    return "Other course that passed filtering"
 
 
 # ── Degree Progress Analysis ─────────────────────────────────────────────────
