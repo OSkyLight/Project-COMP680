@@ -7,9 +7,6 @@ export interface PdfStudentInfo {
   degree_program: string;
 }
 import { Header } from "./components/Header";
-import { ProgressOverview } from "./components/ProgressOverview";
-import { StudentProfile } from "./components/StudentProfile";
-import { Recommendations } from "./components/Recommendations";
 import { BackendDemoPanel } from "./components/BackendDemoPanel";
 import { PdfRecommendations } from "./components/PdfRecommendations";
 import {
@@ -72,20 +69,6 @@ export default function App() {
         {activeTab === "dashboard" && (
           <div className="space-y-6">
             <BackendDemoPanel currentStudent={currentStudent} onStudentChange={setCurrentStudent} />
-            {/* Top row: profile + progress */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-1">
-                <StudentProfile currentStudent={currentStudent} />
-              </div>
-              <div className="lg:col-span-2">
-                <ProgressOverview currentStudent={currentStudent} />
-              </div>
-            </div>
-
-            {/* AI Recommendations (full width) */}
-            <div>
-              <Recommendations />
-            </div>
           </div>
         )}
 

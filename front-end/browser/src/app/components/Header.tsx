@@ -6,33 +6,8 @@ interface HeaderProps {
   pdfStudent?: PdfStudentInfo | null;
 }
 
-interface InfoBox {
-  value: string;
-  label: string;
-}
-
 export function Header({ pdfStudent }: HeaderProps) {
-  const boxes: InfoBox[] = pdfStudent
-    ? [
-        { value: pdfStudent.student_name, label: "Student" },
-        { value: pdfStudent.student_id || "N/A", label: "Student ID" },
-        { value: pdfStudent.degree_program || "N/A", label: "Program" },
-        { value: "N/A", label: "Current Semester" },
-      ]
-    : [
-        { value: student.name.split(" ")[0], label: "Student" },
-        { value: student.gpa.toFixed(2), label: "GPA" },
-        { value: student.standing, label: "Standing" },
-        { value: student.current_semester, label: "Current Semester" },
-      ];
-
   const breadcrumb = pdfStudent ? pdfStudent.degree_program || "—" : student.major;
-
-  function valueFontSize(value: string): string {
-    if (value.length <= 12) return "1.1rem";
-    if (value.length <= 24) return "0.88rem";
-    return "0.75rem";
-  }
 
   return (
     <header className="bg-[#CC0000] text-white shadow-lg">
@@ -74,17 +49,6 @@ export function Header({ pdfStudent }: HeaderProps) {
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            {boxes.map((box) => (
-              <div key={box.label} className="bg-red-700/60 rounded-xl px-4 py-2 text-center min-w-[100px] max-w-[220px]">
-                <div
-                  className="text-white leading-tight break-words"
-                  style={{ fontSize: valueFontSize(box.value), fontWeight: 700 }}
-                >
-                  {box.value}
-                </div>
-                <div className="text-red-200 mt-0.5" style={{ fontSize: "0.7rem" }}>{box.label}</div>
-              </div>
-            ))}
           </div>
         </div>
       </div>
