@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { UploadCloud, Loader2, AlertCircle, FileText, CheckCircle2 } from "lucide-react";
+import { UploadCloud, Loader2, AlertCircle, FileText, CheckCircle2, GraduationCap } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "./ui/card";
 import type { PdfStudentInfo } from "../App";
 import { apiUrl } from "../utils/api";
@@ -17,6 +17,21 @@ interface RecommendedCourse {
   reason?: string;
 }
 
+interface DegreeProgress {
+  completed_required_core: string[];
+  missing_required_core: string[];
+  completed_lower_division_major: string[];
+  missing_lower_division_major: string[];
+  life_science_requirement_satisfied: boolean;
+  physical_science_requirement_satisfied: boolean;
+  completed_science_requirements: string[];
+  missing_science_requirements: string[];
+  completed_senior_electives: string[];
+  senior_elective_units_completed: number;
+  senior_elective_units_remaining: number;
+  notes: string[];
+}
+
 interface PdfResult {
   filename: string;
   student_name: string;
@@ -25,6 +40,7 @@ interface PdfResult {
   excluded_course_codes: string[];
   recommended: RecommendedCourse[];
   reasoning: string[];
+  degree_progress?: DegreeProgress;
 }
 
 interface CourseSection {
@@ -208,6 +224,11 @@ export function PdfRecommendations({ onPdfResult }: PdfRecommendationsProps) {
             </CardContent>
           </Card>
 
+          {/* Degree Progress Summary */}
+          {result.degree_progress && (
+            <DegreeProgressCard dp={result.degree_progress} />
+          )}
+
           {/* Reasoning */}
           <Card>
             <CardHeader>
@@ -269,6 +290,132 @@ function InfoRow({ label, value }: { label: string; value: string }) {
     <div>
       <span className="text-xs text-gray-400 uppercase tracking-wide">{label}</span>
       <p className="text-gray-800 font-medium">{value || "—"}</p>
+    </div>
+  );
+}
+
+function DegreeProgressCard({ dp }: { dp: DegreeProgress }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-gray-800">
+          <GraduationCap className="w-5 h-5 text-[#CC0000]" />
+          Degree Progress Summary
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-2 space-y-5">
+        {/* Missing Required Core */}
+        <ProgressSection
+          label="Missing Required Core Courses"
+          items={dp.missing_required_core}
+          emptyMessage="No missing required core courses detected."
+        />
+
+        {/* Missing Lower Division */}
+        <ProgressSection
+          label="Missing Lower Division Major Courses"
+          items={dp.missing_lower_division_major}
+          emptyMessage="No missing lower-division major courses detected."
+        />
+
+        {/* Science Requirements */}
+        <div>
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+            Science Requirements
+          </p>
+          <div className="space-y-1.5">
+            <ScienceRow label="Life Science" satisfied={dp.life_science_requirement_satisfied} />
+            <ScienceRow label="Physical Science" satisfied={dp.physical_science_requirement_satisfied} />
+          </div>
+        </div>
+
+        {/* Senior Elective Progress */}
+        <div>
+          <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+            Senior Elective Progress
+          </p>
+          <div className="flex flex-wrap gap-4 text-sm">
+            <div>
+              <p className="text-xs text-gray-400 mb-0.5">Completed</p>
+              <p className="text-gray-800 font-semibold">
+                {dp.senior_elective_units_completed} units
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 mb-0.5">Remaining</p>
+              <p className={`font-semibold ${dp.senior_elective_units_remaining === 0 ? "text-green-600" : "text-gray-800"}`}>
+                {dp.senior_elective_units_remaining === 0
+                  ? "Complete"
+                  : `${dp.senior_elective_units_remaining} units`}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Notes */}
+        {dp.notes.length > 0 && (
+          <div>
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Notes</p>
+            <ul className="space-y-1">
+              {dp.notes.map((note, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+                  <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[#CC0000] flex-shrink-0" />
+                  {note}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProgressSection({
+  label,
+  items,
+  emptyMessage,
+}: {
+  label: string;
+  items: string[];
+  emptyMessage: string;
+}) {
+  return (
+    <div>
+      <p className="text-xs text-gray-400 uppercase tracking-wide mb-1.5">{label}</p>
+      {items.length === 0 ? (
+        <p className="flex items-center gap-1.5 text-sm text-green-600">
+          <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+          {emptyMessage}
+        </p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {items.map((code) => (
+            <span
+              key={code}
+              className="text-xs bg-red-50 text-red-700 border border-red-200 rounded-full px-2.5 py-0.5"
+            >
+              {code}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ScienceRow({ label, satisfied }: { label: string; satisfied: boolean }) {
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      {satisfied ? (
+        <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+      ) : (
+        <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+      )}
+      <span className="text-gray-600">{label}:</span>
+      <span className={`font-medium ${satisfied ? "text-green-600" : "text-amber-600"}`}>
+        {satisfied ? "Satisfied" : "Missing"}
+      </span>
     </div>
   );
 }

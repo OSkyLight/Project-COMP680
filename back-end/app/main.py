@@ -453,7 +453,8 @@ def _norm(code: str) -> str:
 # ── Filtering ────────────────────────────────────────────────────────────────
 
 def _should_exclude_course(c: models.Course, excluded_codes: set) -> bool:
-    if str(c.course_code) in excluded_codes:
+    # excluded_codes contains normalized codes; normalize the DB code to match
+    if _norm(str(c.course_code)) in excluded_codes:
         return True
     code = str(c.course_code).upper()
     name = str(c.course_name).upper()
@@ -645,14 +646,16 @@ async def recommend_from_pdf(
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
 
-    completed = {str(c["course_code"]) for c in extracted.get("completed_courses", [])}
-    in_progress = {str(c["course_code"]) for c in extracted.get("in_progress_courses", [])}
-    excluded = completed | in_progress
+    completed_raw = {str(c["course_code"]) for c in extracted.get("completed_courses", [])}
+    in_progress_raw = {str(c["course_code"]) for c in extracted.get("in_progress_courses", [])}
+    # Normalized set used for filtering — handles mismatches between PDF and DB
+    # format (e.g. "COMP 310" vs "COMP310"). Both sides are normalized before comparison.
+    excluded_norms = {_norm(code) for code in completed_raw | in_progress_raw}
 
     degree_progress = _analyze_degree_progress(extracted)
 
     courses = db.query(models.Course).order_by(models.Course.course_id.asc()).all()
-    filtered = [c for c in courses if not _should_exclude_course(c, excluded)]
+    filtered = [c for c in courses if not _should_exclude_course(c, excluded_norms)]
     filtered.sort(key=_course_score)
 
     recommended = [
@@ -677,7 +680,7 @@ async def recommend_from_pdf(
         "student_name": extracted.get("student_name", ""),
         "student_id": extracted.get("student_id", ""),
         "degree_program": extracted.get("degree_program", ""),
-        "excluded_course_codes": sorted(excluded),
+        "excluded_course_codes": sorted(completed_raw | in_progress_raw),
         "recommended": recommended,
         "degree_progress": degree_progress,
         "reasoning": [
